@@ -8,6 +8,7 @@ package valve
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"net"
 	"time"
 )
@@ -67,6 +68,7 @@ func computeNextFilterList(filters []string) ([]string, []string) {
 func (this *MasterServerQuerier) Query(callback MasterQueryCallback) error {
 	filters, remaining := computeNextFilterList(this.filters)
 	for {
+
 		if err := this.tryQuery(callback, filters); err != nil {
 			return err
 		}
@@ -75,6 +77,7 @@ func (this *MasterServerQuerier) Query(callback MasterQueryCallback) error {
 			break
 		}
 		filters, remaining = computeNextFilterList(remaining)
+		log.Println("There is: ", remaining)
 	}
 	return nil
 }
@@ -130,24 +133,27 @@ func (this *MasterServerQuerier) tryQuery(callback MasterQueryCallback, filters 
 	for {
 		reader := NewPacketReader(packet)
 		serverCount := len(packet) / 6
-
+		//log.Println(len(packet), len(packet)/6)
 		if serverCount == 0 {
 			break
 		}
-
+		// it was serverCount instead of 3
 		servers := ServerList{}
 		for i := 0; i < serverCount; i++ {
 			ip, err = reader.ReadIPv4()
 			if err != nil {
+				log.Println("ERROR read ipv4")
 				return err
 			}
 			port, err = reader.ReadPort()
 			if err != nil {
+				log.Println("ERROR read port")
 				return err
 			}
 
 			// The list is terminated with 0s.
 			if ip.Equal(kNullIP) && port == 0 {
+				fmt.Println("Bro, This is the real one")
 				done = true
 				break
 			}
@@ -157,16 +163,19 @@ func (this *MasterServerQuerier) tryQuery(callback MasterQueryCallback, filters 
 				Port: int(port),
 			}
 			if _, found := seen[addr.String()]; found {
+				log.Println("I Found a server")
 				continue
 			}
 
 			servers = append(servers, addr)
+			log.Println(servers)
 			seen[addr.String()] = true
 		}
 
 		if err := callback(servers); err != nil {
 			return err
 		}
+		done = true
 
 		if done {
 			break

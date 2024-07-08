@@ -5,6 +5,10 @@
 // See LICENSE.txt for more details.
 package batch
 
+import (
+	"log"
+)
+
 // A batch is a list of arbitrary items.
 type Batch interface {
 	Item(index int) interface{}
@@ -12,7 +16,7 @@ type Batch interface {
 }
 
 // Callback function to process items.
-type Callback func(item interface{})
+type Callback func(b *BatchProcessor, item interface{})
 
 // A batch processor feeds items into a goroutine for processing.
 type BatchProcessor struct {
@@ -80,6 +84,7 @@ func (this *BatchProcessor) send_stop(terminate bool) {
 	if this.stopped {
 		return
 	}
+
 	this.stopped = true
 
 	// Signal to the processing routine that it should stop.
@@ -99,7 +104,7 @@ func (this *BatchProcessor) enqueueItem(item interface{}) {
 			taskDone <- true
 		})()
 
-		callback(item)
+		callback(this, item)
 	})(this.callback, this.taskDone, item)
 }
 
@@ -121,7 +126,7 @@ func (this *BatchProcessor) enqueueBatch(batch Batch) {
 }
 
 // This should only be called from processBatch().
-func (this *BatchProcessor) workRemaining() bool {
+func (this *BatchProcessor) WorkRemaining() bool {
 	return len(this.worklist) > 0 || this.outstanding > 0
 }
 
@@ -130,13 +135,14 @@ func (this *BatchProcessor) waitForBatches() {
 	// Setup local state.
 	stopped := false
 	terminated := false
-
 	for {
 		select {
 		case batch := <-this.batchQueue:
+			log.Println(this)
 			this.enqueueBatch(batch)
 
 		case <-this.taskDone:
+			//fmt.Println("[INFO] I Done requested a server")
 			// A single task has completed.
 			this.outstanding--
 
@@ -150,16 +156,18 @@ func (this *BatchProcessor) waitForBatches() {
 				continue
 			}
 
-			if !this.workRemaining() && stopped {
+			if !this.WorkRemaining() && stopped {
 				// If there's no work left to do, and the parent thread is
 				// waiting on us to finish, then leave now.
 				if !terminated {
+					log.Println("my bot telegram bro nice1")
 					this.finishedSignal <- true
 				}
 				return
 			}
 
 		case terminated = <-this.stopCommand:
+			log.Println("Really Read Done")
 			stopped = true
 
 			if terminated {
@@ -183,7 +191,8 @@ func (this *BatchProcessor) waitForBatches() {
 				}
 			}
 
-			if !this.workRemaining() {
+			if !this.WorkRemaining() {
+				log.Println("my bot telegram bro nice")
 				this.finishedSignal <- true
 				return
 			}
