@@ -56,7 +56,7 @@ func queryMaster(db *Database, game_id int64, callback ServerCallback) {
 		panic("unknown game_id")
 	}
 
-	bp := batch.NewBatchProcessor(func(item interface{}) {
+	bp := batch.NewBatchProcessor(func(_ *batch.Config, item interface{}) {
 		server, err := queryServer(item.(*net.TCPAddr))
 		if server == nil {
 			if err != nil {

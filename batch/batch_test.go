@@ -25,7 +25,7 @@ func TestBasic(t *testing.T) {
 	var lock sync.Mutex
 	items := make([]interface{}, 0)
 
-	bp := NewBatchProcessor(func(item interface{}) {
+	bp := NewBatchProcessor(func(_ *Config, item interface{}) {
 		lock.Lock()
 		defer lock.Unlock()
 
@@ -54,7 +54,7 @@ func TestBasic(t *testing.T) {
 }
 
 func TestTerminate(t *testing.T) {
-	bp := NewBatchProcessor(func(item interface{}) {
+	bp := NewBatchProcessor(func(_ *Config, item interface{}) {
 		time.Sleep(time.Second)
 	}, 10)
 

@@ -6,7 +6,9 @@
 package batch
 
 import (
+	"fmt"
 	"log"
+	"time"
 )
 
 // A batch is a list of arbitrary items.
@@ -15,14 +17,36 @@ type Batch interface {
 	Len() int
 }
 
+// Arguments used for blaster
+type Config struct {
+	Flag_name    string
+	Flag_fname   string
+	Flag_flen    int
+	Flag_fmap    string
+	Flag_appids  string
+	Flag_appid   int
+	Flag_master  string
+	Flag_j       int // number of concurrent requests
+	Flag_timeout time.Duration
+	Flag_format  string
+	Flag_outfile string
+	Flag_norules bool
+}
+
+func (p *Config) Usage() string {
+	return fmt.Sprint(
+		"Usage: /search <Flag_name> <flag_appid|?> <flag_master|?> <flag_j|?> <flag_norules|?>",
+	)
+}
+
 // Callback function to process items.
-type Callback func(b *BatchProcessor, item interface{})
+type Callback func(gameFilter *Config, item interface{})
 
 // A batch processor feeds items into a goroutine for processing.
 type BatchProcessor struct {
-	callback Callback
-	maxTasks int
-
+	callback       Callback
+	maxTasks       int
+	gameFilter     Config
 	batchQueue     chan Batch
 	stopCommand    chan bool
 	finishedSignal chan bool
@@ -37,9 +61,9 @@ type BatchProcessor struct {
 // Create a new batch processor.
 func NewBatchProcessor(callback Callback, maxTasks int) *BatchProcessor {
 	processor := &BatchProcessor{
-		callback: callback,
-		maxTasks: maxTasks,
-
+		callback:   callback,
+		maxTasks:   maxTasks,
+		gameFilter: Config{},
 		// We expect batch communication to be fast, so we let it block. The
 		// master takes time to reply anyway.
 		//
@@ -65,6 +89,10 @@ func NewBatchProcessor(callback Callback, maxTasks int) *BatchProcessor {
 // Adds a batch to the batch processor.
 func (this *BatchProcessor) AddBatch(batch Batch) {
 	this.batchQueue <- batch
+}
+
+func (this *BatchProcessor) SetConfig(user_config Config) {
+	this.gameFilter = user_config
 }
 
 // Signals that no more batches are incoming, and then waits for batch
@@ -104,7 +132,7 @@ func (this *BatchProcessor) enqueueItem(item interface{}) {
 			taskDone <- true
 		})()
 
-		callback(this, item)
+		callback(&this.gameFilter, item)
 	})(this.callback, this.taskDone, item)
 }
 
